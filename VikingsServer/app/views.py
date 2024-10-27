@@ -1,6 +1,6 @@
-import requests
+import random
+
 from django.contrib.auth import authenticate
-from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import status
@@ -24,9 +24,12 @@ def get_moderator():
 
 @api_view(["GET"])
 def search_places(request):
-    query = request.GET.get("query", "")
+    place_name = request.GET.get("place_name", "")
 
-    places = Place.objects.filter(status=1).filter(name__icontains=query)
+    places = Place.objects.filter(status=1)
+
+    if place_name:
+        places = places.filter(name__icontains=place_name)
 
     serializer = PlaceSerializer(places, many=True)
 
@@ -59,14 +62,9 @@ def update_place(request, place_id):
 
     place = Place.objects.get(pk=place_id)
 
-    image = request.data.get("image")
-    if image is not None:
-        place.image = image
-        place.save()
+    serializer = PlaceSerializer(place, data=request.data, partial=True)
 
-    serializer = PlaceSerializer(place, data=request.data, many=False, partial=True)
-
-    if serializer.is_valid():
+    if serializer.is_valid(raise_exception=True):
         serializer.save()
 
     return Response(serializer.data)
@@ -74,7 +72,11 @@ def update_place(request, place_id):
 
 @api_view(["POST"])
 def create_place(request):
-    Place.objects.create()
+    serializer = PlaceSerializer(data=request.data, partial=False)
+
+    serializer.is_valid(raise_exception=True)
+
+    Place.objects.create(**serializer.validated_data)
 
     places = Place.objects.filter(status=1)
     serializer = PlaceSerializer(places, many=True)
@@ -114,15 +116,14 @@ def add_place_to_expedition(request, place_id):
 
     if PlaceExpedition.objects.filter(expedition=draft_expedition, place=place).exists():
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
-    
+        
     item = PlaceExpedition.objects.create()
     item.expedition = draft_expedition
     item.place = place
     item.save()
 
-    items = PlaceExpedition.objects.filter(expedition=draft_expedition)
-    places = [PlaceSerializer(item.place, many=False).data for item in items]
-    return Response(places)
+    serializer = ExpeditionSerializer(draft_expedition)
+    return Response(serializer.data["places"])
 
 
 @api_view(["POST"])
@@ -181,7 +182,7 @@ def update_expedition(request, expedition_id):
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     expedition = Expedition.objects.get(pk=expedition_id)
-    serializer = ExpeditionSerializer(expedition, data=request.data, many=False, partial=True)
+    serializer = ExpeditionSerializer(expedition, data=request.data, partial=True)
 
     if serializer.is_valid():
         serializer.save()
@@ -223,14 +224,17 @@ def update_status_admin(request, expedition_id):
     if expedition.status != 2:
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
+    if request_status == 3:
+        for item in PlaceExpedition.objects.filter(expedition=expedition):
+            item.calc = random.randint(50, 150)
+            item.save()
+
     expedition.date_complete = timezone.now()
     expedition.status = request_status
     expedition.moderator = get_moderator()
     expedition.save()
 
-    serializer = ExpeditionSerializer(expedition, many=False)
-
-    return Response(serializer.data)
+    return Response(status=status.HTTP_200_OK)
 
 
 @api_view(["DELETE"])
@@ -278,7 +282,7 @@ def update_place_in_expedition(request, expedition_id, place_id):
 
     item = PlaceExpedition.objects.get(place_id=place_id, expedition_id=expedition_id)
 
-    serializer = PlaceExpeditionSerializer(item, data=request.data, many=False, partial=True)
+    serializer = PlaceExpeditionSerializer(item, data=request.data,  partial=True)
 
     if serializer.is_valid():
         serializer.save()
@@ -327,7 +331,7 @@ def update_user(request, user_id):
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     user = User.objects.get(pk=user_id)
-    serializer = UserSerializer(user, data=request.data, many=False, partial=True)
+    serializer = UserSerializer(user, data=request.data, partial=True)
 
     if not serializer.is_valid():
         return Response(status=status.HTTP_409_CONFLICT)

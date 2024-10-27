@@ -74,8 +74,8 @@ def add_places():
 
 
 def add_expeditions():
-    users = User.objects.filter(is_superuser=False)
-    moderators = User.objects.filter(is_superuser=True)
+    users = User.objects.filter(is_staff=False)
+    moderators = User.objects.filter(is_staff=True)
 
     if len(users) == 0 or len(moderators) == 0:
         print("Заявки не могут быть добавлены. Сначала добавьте пользователей с помощью команды add_users")
@@ -85,18 +85,21 @@ def add_expeditions():
 
     for _ in range(30):
         status = random.randint(2, 5)
-        add_expedition(status, places, users, moderators)
+        owner = random.choice(users)
+        add_expedition(status, places, owner, moderators)
 
-    add_expedition(1, places, users, moderators)
+    add_expedition(1, places, users[0], moderators)
+    add_expedition(2, places, users[0], moderators)
 
     print("Заявки добавлены")
 
 
-def add_expedition(status, places, users, moderators):
+def add_expedition(status, places, owner, moderators):
     expedition = Expedition.objects.create()
     expedition.status = status
 
     if expedition.status in [3, 4]:
+        expedition.moderator = random.choice(moderators)
         expedition.date_complete = random_date()
         expedition.date_formation = expedition.date_complete - random_timedelta()
         expedition.date_created = expedition.date_formation - random_timedelta()
@@ -104,20 +107,17 @@ def add_expedition(status, places, users, moderators):
         expedition.date_formation = random_date()
         expedition.date_created = expedition.date_formation - random_timedelta()
 
-    expedition.owner = random.choice(users)
+    expedition.owner = owner
     expedition.moderator = random.choice(moderators)
 
-    expedition.viking = "Рагнар Лодброк"
-
-    count = 1
     for place in random.sample(list(places), 3):
         item = PlaceExpedition(
             expedition=expedition,
             place=place,
-            value=count
+            value=random.randint(1, 10),
+            calc=random.randint(50, 150) if expedition.status == 3 else None
         )
         item.save()
-        count += 1
 
     expedition.save()
 
@@ -127,22 +127,3 @@ class Command(BaseCommand):
         add_users()
         add_places()
         add_expeditions()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

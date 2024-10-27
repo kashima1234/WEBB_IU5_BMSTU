@@ -1,32 +1,56 @@
 from rest_framework import serializers
 
+from . import utils
 from .models import *
 
 
 class PlaceSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     def get_image(self, place):
-        return place.image.url.replace("minio", "localhost", 1)
+        if place.image:
+            return place.image.url.replace("minio", "localhost", 1)
+
+        return "http://localhost:9000/images/default.png"
 
     class Meta:
         model = Place
         fields = "__all__"
 
 
+class PlaceItemSerializer(utils.CustomSerializer):
+    image = serializers.SerializerMethodField()
+    value = serializers.SerializerMethodField()
+    calc = serializers.SerializerMethodField()
+
+    def get_image(self, place):
+        if place.image:
+            return place.image.url.replace("minio", "localhost", 1)
+
+        return "http://localhost:9000/images/default.png"
+
+    def get_value(self, place):
+        return self.context.get("value")
+
+    def get_calc(self, place):
+        return self.context.get("calc")
+
+    class Meta:
+        model = Place
+        fields = ("id", "name", "image", "value", "calc")
+
+
 class ExpeditionSerializer(serializers.ModelSerializer):
     places = serializers.SerializerMethodField()
-    owner = serializers.SerializerMethodField()
-    moderator = serializers.SerializerMethodField()
-
-    def get_owner(self, expedition):
-        return expedition.owner.username
-
-    def get_moderator(self, expedition):
-        if expedition.moderator:
-            return expedition.moderator.username
+    owner = serializers.StringRelatedField(read_only=True)
+    moderator = serializers.StringRelatedField(read_only=True)
             
     def get_places(self, expedition):
         items = PlaceExpedition.objects.filter(expedition=expedition)
-        return [{**PlaceSerializer(item.place).data, "value": item.value} for item in items]
+        if expedition.status == 3:
+            return [PlaceItemSerializer(item.place, context={"value": item.value, "calc": item.calc}).data for item in items]
+
+        return [PlaceItemSerializer(item.place, context={"value": item.value}, excluded_fields=("calc", )).data for item in items]
 
     class Meta:
         model = Expedition
@@ -34,15 +58,8 @@ class ExpeditionSerializer(serializers.ModelSerializer):
 
 
 class ExpeditionsSerializer(serializers.ModelSerializer):
-    owner = serializers.SerializerMethodField()
-    moderator = serializers.SerializerMethodField()
-
-    def get_owner(self, expedition):
-        return expedition.owner.username
-
-    def get_moderator(self, expedition):
-        if expedition.moderator:
-            return expedition.moderator.username
+    owner = serializers.StringRelatedField(read_only=True)
+    moderator = serializers.StringRelatedField(read_only=True)
 
     class Meta:
         model = Expedition
@@ -58,21 +75,19 @@ class PlaceExpeditionSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'email', 'username', 'first_name', 'last_name')
+        fields = ('id', 'email', 'username')
 
 
 class UserRegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'email', 'password', 'first_name', 'last_name', 'username')
+        fields = ('id', 'email', 'password', 'username')
         write_only_fields = ('password',)
         read_only_fields = ('id',)
 
     def create(self, validated_data):
         user = User.objects.create(
             email=validated_data['email'],
-            first_name=validated_data['first_name'],
-            last_name=validated_data['last_name'],
             username=validated_data['username']
         )
 

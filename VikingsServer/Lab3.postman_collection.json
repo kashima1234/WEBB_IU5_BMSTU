@@ -1,6 +1,6 @@
 {
 	"info": {
-		"_postman_id": "437e8d7c-7758-453e-8fc8-2bafd868ce58",
+		"_postman_id": "f739ba00-a119-4ace-bb04-304902b207db",
 		"name": "Lab3",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "33669280"
@@ -8,9 +8,22 @@
 	"item": [
 		{
 			"name": "Города",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
 			"request": {
 				"method": "GET",
-				"header": [],
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "sit7702b2pj2lic93d2b1ad6ukohnr6v",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": []
+				},
 				"url": {
 					"raw": "http://localhost:8000/api/places/",
 					"protocol": "http",
@@ -104,7 +117,7 @@
 			"response": []
 		},
 		{
-			"name": "Удаление продакта",
+			"name": "Удаление города",
 			"request": {
 				"method": "DELETE",
 				"header": [],
@@ -130,7 +143,13 @@
 			"name": "Добавление города в поход",
 			"request": {
 				"method": "POST",
-				"header": [],
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzI5NDQxMzk0LCJpYXQiOjE3MjkzNTQ5OTQsInVzZXJfaWQiOjF9.HhYXiblh2Q6usXvkhuJ0wcxm6tndKF4UUpe3ukmKewI",
+						"type": "text"
+					}
+				],
 				"url": {
 					"raw": "http://localhost:8000/api/places/1/add_to_expedition/",
 					"protocol": "http",
@@ -186,9 +205,15 @@
 			"name": "Походы",
 			"request": {
 				"method": "GET",
-				"header": [],
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "mfg0uc3mnlmv2mwthdjznlkw3pjcjh2v",
+						"type": "text"
+					}
+				],
 				"url": {
-					"raw": "http://localhost:8000/api/expeditions/?date_start=2023-11-11&date_end=2025-09-11&status=3",
+					"raw": "http://localhost:8000/api/expeditions/",
 					"protocol": "http",
 					"host": [
 						"localhost"
@@ -201,16 +226,9 @@
 					],
 					"query": [
 						{
-							"key": "date_start",
-							"value": "2023-11-11"
-						},
-						{
-							"key": "date_end",
-							"value": "2025-09-11"
-						},
-						{
 							"key": "status",
-							"value": "3"
+							"value": "3",
+							"disabled": true
 						}
 					]
 				}
@@ -310,7 +328,7 @@
 				"method": "PUT",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:8000/api/expeditions/31/update_status_user/",
+					"raw": "http://localhost:8000/api/expeditions/32/update_status_user/",
 					"protocol": "http",
 					"host": [
 						"localhost"
@@ -319,7 +337,7 @@
 					"path": [
 						"api",
 						"expeditions",
-						"31",
+						"32",
 						"update_status_user",
 						""
 					]
@@ -334,7 +352,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"status\": 4\r\n}",
+					"raw": "{\r\n    \"status\": 3\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -342,7 +360,7 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:8000/api/expeditions/31/update_status_admin/",
+					"raw": "http://localhost:8000/api/expeditions/32/update_status_admin/",
 					"protocol": "http",
 					"host": [
 						"localhost"
@@ -351,7 +369,7 @@
 					"path": [
 						"api",
 						"expeditions",
-						"31",
+						"32",
 						"update_status_admin",
 						""
 					]
@@ -444,7 +462,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"username\": \"user1\",\r\n    \"password\": \"1234\"\r\n}",
+					"raw": "{\r\n    \"username\": \"root\",\r\n    \"password\": \"1234\"\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -504,7 +522,13 @@
 			"name": "Деавторизация",
 			"request": {
 				"method": "POST",
-				"header": [],
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "mfg0uc3mnlmv2mwthdjznlkw3pjcjh2v",
+						"type": "text"
+					}
+				],
 				"url": {
 					"raw": "http://localhost:8000/api/users/logout/",
 					"protocol": "http",
