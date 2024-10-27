@@ -120,12 +120,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SESSION_LIFETIME = timedelta(days=1)
 
-JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
-    "ALGORITHM": "HS256",
-    "SIGNING_KEY": "MY_SIGNING_KEY_123",
-}
-
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",

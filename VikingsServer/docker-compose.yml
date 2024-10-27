@@ -99,17 +99,20 @@ services:
 
   redis:
     image: redis:latest
-    container_name:   redis
+    container_name: redis
     restart: always
-    ports:
-      - "6379:6379"
     volumes:
       - ./:/usr/src/app/dаta:/root/redis
       - ./:/usr/src/app/redis.conf:/usr/local/etc/redis/redis.conf
     environment:
-      - REDIS_PASSWORD=my-password
       - REDIS_PORT=6379
-      - REDIS_DATABASES=16
+
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: redis-insight
+    restart: always
+    ports:
+      - "5540:5540"
 
 volumes:
   pgdbdata: null

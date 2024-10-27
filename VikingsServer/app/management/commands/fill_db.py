@@ -99,6 +99,7 @@ def add_expedition(status, places, owner, moderators):
     expedition.status = status
 
     if expedition.status in [3, 4]:
+        expedition.moderator = random.choice(moderators)
         expedition.date_complete = random_date()
         expedition.date_formation = expedition.date_complete - random_timedelta()
         expedition.date_created = expedition.date_formation - random_timedelta()
@@ -109,17 +110,14 @@ def add_expedition(status, places, owner, moderators):
     expedition.owner = owner
     expedition.moderator = random.choice(moderators)
 
-    expedition.viking = "Рагнар Лодброк"
-
-    count = 1
     for place in random.sample(list(places), 3):
         item = PlaceExpedition(
             expedition=expedition,
             place=place,
-            value=count
+            value=random.randint(1, 10),
+            calc=random.randint(50, 150) if expedition.status == 3 else None
         )
         item.save()
-        count += 1
 
     expedition.save()
 

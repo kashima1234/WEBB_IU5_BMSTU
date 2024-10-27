@@ -1,4 +1,7 @@
+import random
+
 from django.contrib.auth import authenticate
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -6,10 +9,9 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from .jwt_helper import *
 from .permissions import *
 from .serializers import *
-from .utils import identity_user
+from .utils import identity_user, get_session
 
 
 def get_draft_expedition(request):
@@ -74,14 +76,9 @@ def update_place(request, place_id):
 
     place = Place.objects.get(pk=place_id)
 
-    image = request.data.get("image")
-    if image is not None:
-        place.image = image
-        place.save()
+    serializer = PlaceSerializer(place, data=request.data)
 
-    serializer = PlaceSerializer(place, data=request.data, many=False, partial=True)
-
-    if serializer.is_valid():
+    if serializer.is_valid(raise_exception=True):
         serializer.save()
 
     return Response(serializer.data)
@@ -90,9 +87,14 @@ def update_place(request, place_id):
 @api_view(["POST"])
 @permission_classes([IsModerator])
 def create_place(request):
-    place = Place.objects.create()
+    serializer = PlaceSerializer(data=request.data, partial=False)
 
-    serializer = PlaceSerializer(place)
+    serializer.is_valid(raise_exception=True)
+
+    Place.objects.create(**serializer.validated_data)
+
+    places = Place.objects.filter(status=1)
+    serializer = PlaceSerializer(places, many=True)
 
     return Response(serializer.data)
 
@@ -150,9 +152,12 @@ def update_place_image(request, place_id):
     place = Place.objects.get(pk=place_id)
 
     image = request.data.get("image")
-    if image is not None:
-        place.image = image
-        place.save()
+
+    if image is None:
+        return Response(status.HTTP_400_BAD_REQUEST)
+
+    place.image = image
+    place.save()
 
     serializer = PlaceSerializer(place)
 
@@ -169,7 +174,7 @@ def search_expeditions(request):
     expeditions = Expedition.objects.exclude(status__in=[1, 5])
 
     user = identity_user(request)
-    if not user.is_staff:
+    if not user.is_superuser:
         expeditions = expeditions.filter(owner=user)
 
     if status_id > 0:
@@ -255,6 +260,11 @@ def update_status_admin(request, expedition_id):
 
     if expedition.status != 2:
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    if request_status == 3:
+        for item in PlaceExpedition.objects.filter(expedition=expedition):
+            item.calc = random.randint(1, 10)
+            item.save()
 
     expedition.status = request_status
     expedition.date_complete = timezone.now()
@@ -363,19 +373,13 @@ def login(request):
     if user is None:
         return Response(status=status.HTTP_401_UNAUTHORIZED)
 
-    # old_session = get_session(request)
-    # if old_session:
-    #     cache.delete(old_session)
-
-    session = create_session(user.id)
-    cache.set(session, settings.SESSION_LIFETIME)
+    request.session.create()
+    session = request.session.session_key
+    cache.set(session, user.id)
 
     serializer = UserSerializer(user)
 
-    response = Response(serializer.data, status=status.HTTP_201_CREATED)
-    response.set_cookie('session', session, httponly=True)
-
-    return response
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 @swagger_auto_schema(method='post', request_body=UserRegisterSerializer)
@@ -388,25 +392,25 @@ def register(request):
 
     user = serializer.save()
 
-    session = create_session(user.id)
-    cache.set(session, settings.SESSION_LIFETIME)
+    request.session.create()
+    session = request.session.session_key
+    cache.set(session, user.id)
 
     serializer = UserSerializer(user)
 
-    response = Response(serializer.data, status=status.HTTP_201_CREATED)
-    response.set_cookie('session', session, httponly=True)
-
-    return response
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def logout(request):
     session = get_session(request)
-
     cache.delete(session)
 
-    return Response(status=status.HTTP_200_OK)
+    response = Response(status=status.HTTP_200_OK)
+    response.delete_cookie('sessionid')
+
+    return response
 
 
 @swagger_auto_schema(method='PUT', request_body=UserSerializer)
