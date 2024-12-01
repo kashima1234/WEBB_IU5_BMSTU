@@ -1,10 +1,9 @@
-import random
-
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from minio import Minio
 
-from ...models import *
-from .utils import random_date, random_timedelta
+from .utils import *
+from app.models import *
 
 
 def add_users():
@@ -14,8 +13,6 @@ def add_users():
     for i in range(1, 10):
         User.objects.create_user(f"user{i}", f"user{i}@user.com", "1234", first_name=f"user{i}", last_name=f"user{i}")
         User.objects.create_superuser(f"root{i}", f"root{i}@root.com", "1234", first_name=f"user{i}", last_name=f"user{i}")
-
-    print("Пользователи созданы")
 
 
 def add_places():
@@ -61,26 +58,20 @@ def add_places():
         image="6.png"
     )
 
-    client = Minio("minio:9000", "minio", "minio123", secure=False)
-    client.fput_object('images', '1.png', "app/static/images/1.png")
-    client.fput_object('images', '2.png', "app/static/images/2.png")
-    client.fput_object('images', '3.png', "app/static/images/3.png")
-    client.fput_object('images', '4.png', "app/static/images/4.png")
-    client.fput_object('images', '5.png', "app/static/images/5.png")
-    client.fput_object('images', '6.png', "app/static/images/6.png")
-    client.fput_object('images', 'default.png', "app/static/images/default.png")
+    client = Minio(settings.MINIO_ENDPOINT,
+                   settings.MINIO_ACCESS_KEY,
+                   settings.MINIO_SECRET_KEY,
+                   secure=settings.MINIO_USE_HTTPS)
 
-    print("Услуги добавлены")
+    for i in range(1, 7):
+        client.fput_object(settings.MINIO_MEDIA_FILES_BUCKET, f'{i}.png', f"app/static/images/{i}.png")
+
+    client.fput_object(settings.MINIO_MEDIA_FILES_BUCKET, 'default.png', "app/static/images/default.png")
 
 
 def add_expeditions():
     users = User.objects.filter(is_staff=False)
     moderators = User.objects.filter(is_staff=True)
-
-    if len(users) == 0 or len(moderators) == 0:
-        print("Заявки не могут быть добавлены. Сначала добавьте пользователей с помощью команды add_users")
-        return
-
     places = Place.objects.all()
 
     for _ in range(30):
@@ -90,15 +81,16 @@ def add_expeditions():
 
     add_expedition(1, places, users[0], moderators)
     add_expedition(2, places, users[0], moderators)
-
-    print("Заявки добавлены")
+    add_expedition(3, places, users[0], moderators)
+    add_expedition(4, places, users[0], moderators)
+    add_expedition(5, places, users[0], moderators)
 
 
 def add_expedition(status, places, owner, moderators):
     expedition = Expedition.objects.create()
     expedition.status = status
 
-    if expedition.status in [3, 4]:
+    if status in [3, 4]:
         expedition.moderator = random.choice(moderators)
         expedition.date_complete = random_date()
         expedition.date_formation = expedition.date_complete - random_timedelta()
@@ -107,16 +99,21 @@ def add_expedition(status, places, owner, moderators):
         expedition.date_formation = random_date()
         expedition.date_created = expedition.date_formation - random_timedelta()
 
-    expedition.owner = owner
-    expedition.moderator = random.choice(moderators)
+    if status == 3:
+        expedition.date = random_date()
 
+    expedition.viking = "Рагнар Лодброк"
+
+    expedition.owner = owner
+
+    i = 1
     for place in random.sample(list(places), 3):
         item = PlaceExpedition(
             expedition=expedition,
             place=place,
-            value=random.randint(1, 10),
-            calc=random.randint(50, 150) if expedition.status == 3 else None
+            order=i
         )
+        i += 1
         item.save()
 
     expedition.save()

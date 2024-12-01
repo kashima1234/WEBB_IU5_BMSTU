@@ -1,4 +1,5 @@
 import random
+import uuid
 
 from django.contrib.auth import authenticate
 from django.utils import timezone
@@ -10,6 +11,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from .permissions import *
+from .redis import session_storage
 from .serializers import *
 from .utils import identity_user, get_session
 
@@ -29,7 +31,7 @@ def get_draft_expedition(request):
     method='get',
     manual_parameters=[
         openapi.Parameter(
-            'query',
+            'place_name',
             openapi.IN_QUERY,
             type=openapi.TYPE_STRING
         )
@@ -44,7 +46,7 @@ def search_places(request):
     if place_name:
         places = places.filter(name__icontains=place_name)
 
-    serializer = PlaceSerializer(places, many=True)
+    serializer = PlacesSerializer(places, many=True)
 
     draft_expedition = get_draft_expedition(request)
 
@@ -164,6 +166,26 @@ def update_place_image(request, place_id):
     return Response(serializer.data)
 
 
+@swagger_auto_schema(
+    method='get',
+    manual_parameters=[
+        openapi.Parameter(
+            'status',
+            openapi.IN_QUERY,
+            type=openapi.TYPE_STRING
+        ),
+        openapi.Parameter(
+            'date_formation_start',
+            openapi.IN_QUERY,
+            type=openapi.TYPE_STRING
+        ),
+        openapi.Parameter(
+            'date_formation_end',
+            openapi.IN_QUERY,
+            type=openapi.TYPE_STRING
+        )
+    ]
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def search_expeditions(request):
@@ -262,9 +284,7 @@ def update_status_admin(request, expedition_id):
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     if request_status == 3:
-        for item in PlaceExpedition.objects.filter(expedition=expedition):
-            item.calc = random.randint(1, 10)
-            item.save()
+        expedition.date = random.randint(1, 10)
 
     expedition.status = request_status
     expedition.date_complete = timezone.now()
@@ -314,29 +334,7 @@ def delete_place_from_expedition(request, expedition_id, place_id):
     serializer = ExpeditionSerializer(expedition)
     places = serializer.data["places"]
 
-    if len(places) == 0:
-        expedition.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
     return Response(places)
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def get_place_expedition(request, expedition_id, place_id):
-    user = identity_user(request)
-
-    if not Expedition.objects.filter(pk=expedition_id, owner=user).exists():
-        return Response(status=status.HTTP_404_NOT_FOUND)
-
-    if not PlaceExpedition.objects.filter(place_id=place_id, expedition_id=expedition_id).exists():
-        return Response(status=status.HTTP_404_NOT_FOUND)
-
-    item = PlaceExpedition.objects.get(place_id=place_id, expedition_id=expedition_id)
-
-    serializer = PlaceExpeditionSerializer(item)
-
-    return Response(serializer.data)
 
 
 @swagger_auto_schema(method='PUT', request_body=PlaceExpeditionSerializer)
@@ -364,6 +362,12 @@ def update_place_in_expedition(request, expedition_id, place_id):
 @swagger_auto_schema(method='post', request_body=UserLoginSerializer)
 @api_view(["POST"])
 def login(request):
+    user = identity_user(request)
+
+    if user is not None:
+        serializer = UserSerializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        
     serializer = UserLoginSerializer(data=request.data)
 
     if not serializer.is_valid():
@@ -373,13 +377,14 @@ def login(request):
     if user is None:
         return Response(status=status.HTTP_401_UNAUTHORIZED)
 
-    request.session.create()
-    session = request.session.session_key
-    cache.set(session, user.id)
+    session_id = str(uuid.uuid4())
+    session_storage.set(session_id, user.id)
 
     serializer = UserSerializer(user)
+    response = Response(serializer.data, status=status.HTTP_200_OK)
+    response.set_cookie("session_id", session_id, samesite="lax")
 
-    return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return response
 
 
 @swagger_auto_schema(method='post', request_body=UserRegisterSerializer)
@@ -392,28 +397,29 @@ def register(request):
 
     user = serializer.save()
 
-    request.session.create()
-    session = request.session.session_key
-    cache.set(session, user.id)
+    session_id = str(uuid.uuid4())
+    session_storage.set(session_id, user.id)
 
     serializer = UserSerializer(user)
+    response = Response(serializer.data, status=status.HTTP_201_CREATED)
+    response.set_cookie("session_id", session_id, samesite="lax")
 
-    return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return response
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def logout(request):
     session = get_session(request)
-    cache.delete(session)
+    session_storage.delete(session)
 
     response = Response(status=status.HTTP_200_OK)
-    response.delete_cookie('sessionid')
+    response.delete_cookie('session_id')
 
     return response
 
 
-@swagger_auto_schema(method='PUT', request_body=UserSerializer)
+@swagger_auto_schema(method='PUT', request_body=UserProfileSerializer)
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
 def update_user(request, user_id):
@@ -430,5 +436,10 @@ def update_user(request, user_id):
         return Response(status=status.HTTP_409_CONFLICT)
 
     serializer.save()
+
+    password = request.data.get("password", None)
+    if password is not None and not user.check_password(password):
+        user.set_password(password)
+        user.save()
 
     return Response(serializer.data, status=status.HTTP_200_OK)

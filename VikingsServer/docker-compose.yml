@@ -107,13 +107,6 @@ services:
     environment:
       - REDIS_PORT=6379
 
-  redis-insight:
-    image: redis/redisinsight:latest
-    container_name: redis-insight
-    restart: always
-    ports:
-      - "5540:5540"
-
 volumes:
   pgdbdata: null
   pgadmin:

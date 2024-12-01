@@ -3,7 +3,7 @@ from .views import *
 
 urlpatterns = [
     # Набор методов для услуг
-    path('api/places/', search_places),  # GET
+    path('api/places/', search_places),  # GET  
     path('api/places/<int:place_id>/', get_place_by_id),  # GET
     path('api/places/<int:place_id>/update/', update_place),  # PUT
     path('api/places/<int:place_id>/update_image/', update_place_image),  # POST
@@ -20,7 +20,6 @@ urlpatterns = [
     path('api/expeditions/<int:expedition_id>/delete/', delete_expedition),  # DELETE
 
     # Набор методов для м-м
-    path('api/expeditions/<int:expedition_id>/places/<int:place_id>/', get_place_expedition),  # GET
     path('api/expeditions/<int:expedition_id>/update_place/<int:place_id>/', update_place_in_expedition),  # PUT
     path('api/expeditions/<int:expedition_id>/delete_place/<int:place_id>/', delete_place_from_expedition),  # DELETE
 

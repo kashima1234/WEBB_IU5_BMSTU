@@ -1,10 +1,9 @@
 from rest_framework import serializers
 
-from . import utils
 from .models import *
 
 
-class PlaceSerializer(serializers.ModelSerializer):
+class PlacesSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
 
     def get_image(self, place):
@@ -14,30 +13,14 @@ class PlaceSerializer(serializers.ModelSerializer):
         return "http://localhost:9000/images/default.png"
 
     class Meta:
+        model = Place
+        fields = ("id", "name", "status", "square", "image")
+
+
+class PlaceSerializer(PlacesSerializer):
+    class Meta(PlacesSerializer.Meta):
         model = Place
         fields = "__all__"
-
-
-class PlaceItemSerializer(utils.CustomSerializer):
-    image = serializers.SerializerMethodField()
-    value = serializers.SerializerMethodField('get_value')
-    calc = serializers.SerializerMethodField()
-
-    def get_image(self, place):
-        if place.image:
-            return place.image.url.replace("minio", "localhost", 1)
-
-        return "http://localhost:9000/images/default.png"
-
-    def get_value(self, place):
-        return self.context.get("value")
-
-    def get_calc(self, place):
-        return self.context.get("calc")
-
-    class Meta:
-        model = Place
-        fields = ("id", "name", "image", "value", "calc")
 
 
 class ExpeditionsSerializer(serializers.ModelSerializer):
@@ -49,21 +32,23 @@ class ExpeditionsSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class ExpeditionSerializer(serializers.ModelSerializer):
+class ExpeditionSerializer(ExpeditionsSerializer):
     places = serializers.SerializerMethodField()
-    owner = serializers.StringRelatedField(read_only=True)
-    moderator = serializers.StringRelatedField(read_only=True)
 
     def get_places(self, expedition):
         items = PlaceExpedition.objects.filter(expedition=expedition)
-        if expedition.status == 3:
-            return [PlaceItemSerializer(item.place, context={"value": item.value, "calc": item.calc}).data for item in items]
+        return [PlaceItemSerializer(item.place, context={"order": item.order}).data for item in items]
 
-        return [PlaceItemSerializer(item.place, context={"value": item.value}, excluded_fields=("calc", )).data for item in items]
-    
+
+class PlaceItemSerializer(PlaceSerializer):
+    order = serializers.SerializerMethodField()
+
+    def get_order(self, _):
+        return self.context.get("order")
+
     class Meta:
-        model = Expedition
-        fields = "__all__"
+        model = Place
+        fields = ("id", "name", "status", "square", "image", "order")
 
 
 class PlaceExpeditionSerializer(serializers.ModelSerializer):
@@ -81,14 +66,14 @@ class UserSerializer(serializers.ModelSerializer):
 class UserRegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('email', 'password', 'username')
+        fields = ('id', 'email', 'password', 'username')
         write_only_fields = ('password',)
         read_only_fields = ('id',)
 
     def create(self, validated_data):
         user = User.objects.create(
             email=validated_data['email'],
-            name=validated_data['name']
+            username=validated_data['username']
         )
 
         user.set_password(validated_data['password'])
@@ -98,5 +83,11 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 
 
 class UserLoginSerializer(serializers.Serializer):
-    username = serializers.CharField(required=True)
-    password = serializers.CharField(required=True)
+    username = serializers.CharField(required=False)
+    password = serializers.CharField(required=False)
+
+
+class UserProfileSerializer(serializers.Serializer):
+    username = serializers.CharField(required=False)
+    email = serializers.CharField(required=False)
+    password = serializers.CharField(required=False)

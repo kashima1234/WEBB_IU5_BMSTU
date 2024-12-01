@@ -1,18 +1,13 @@
-from django.contrib.auth.models import User
-from django.core.cache import cache
 from rest_framework.permissions import BasePermission
 
-from app.utils import get_session
+from app.utils import identity_user
 
 
 class IsAuthenticated(BasePermission):
     def has_permission(self, request, view):
-        session = get_session(request)
+        user = identity_user(request)
 
-        try:
-            user_id = cache.get(session)
-            user = User.objects.get(pk=user_id)
-        except:
+        if user is None:
             return False
 
         return user.is_active
@@ -20,15 +15,9 @@ class IsAuthenticated(BasePermission):
 
 class IsModerator(BasePermission):
     def has_permission(self, request, view):
-        session = get_session(request)
+        user = identity_user(request)
 
-        if session is None or session not in cache:
-            return False
-
-        try:
-            user_id = cache.get(session)
-            user = User.objects.get(pk=user_id)
-        except:
+        if user is None:
             return False
 
         return user.is_superuser

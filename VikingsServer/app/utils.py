@@ -1,45 +1,35 @@
 import random
 from datetime import datetime, timedelta
+
 from django.utils import timezone
 
 from app.models import User
-from django.core.cache import cache
 
-from rest_framework import serializers
-
-
-class CustomSerializer(serializers.ModelSerializer):
-    def __init__(self, *args, **kwargs):
-
-        excluded_fields = kwargs.pop('excluded_fields', None)
-
-        super().__init__(*args, **kwargs)
-
-        if excluded_fields is not None:
-            excluded = set(excluded_fields)
-            for field_name in excluded:
-                self.fields.pop(field_name)
+from app.redis import session_storage
 
 
 def identity_user(request):
     session = get_session(request)
 
-    if session is None or session not in cache:
-        return False
+    if session is None or session not in session_storage:
+        return None
 
-    user_id = cache.get(session)
+    user_id = session_storage.get(session)
     user = User.objects.get(pk=user_id)
 
     return user
 
 
 def get_session(request):
-    cookie = request.headers.get("Cookie")
+    # Пробуем авторизоваться по куке session_id
+    if request.COOKIES.get("session_id"):
+        return request.COOKIES.get("session_id")
 
-    if "sessionid" in cookie:
-        return request.session.session_key
+    # Пробуем авторизоваться по заголовку Cookie
+    if request.headers.get("Cookie"):
+        return request.headers.get("Cookie").split(" ")[0]
 
-    return cookie
+    return None
 
 
 def random_date():

@@ -118,8 +118,6 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-SESSION_LIFETIME = timedelta(days=1)
-
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
@@ -130,10 +128,16 @@ CACHES = {
     }
 }
 
-DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-AWS_STORAGE_BUCKET_NAME = 'images'
-AWS_ACCESS_KEY_ID = 'minio'
-AWS_SECRET_ACCESS_KEY = 'minio123'
-AWS_S3_ENDPOINT_URL = "http://minio:9000"
-AWS_S3_URL_PROTOCOL = "http:"
-AWS_S3_USE_SSL = False
+DEFAULT_FILE_STORAGE = 'django_minio_backend.models.MinioBackend'
+
+MINIO_ENDPOINT = 'minio:9000'
+MINIO_ACCESS_KEY = 'minio'
+MINIO_SECRET_KEY = 'minio123'
+MINIO_USE_HTTPS = False
+MINIO_PUBLIC_BUCKETS = [
+    'images'
+]
+MINIO_MEDIA_FILES_BUCKET = "images"
+
+REDIS_HOST = "redis"
+REDIS_PORT = 6379
