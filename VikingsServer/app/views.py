@@ -1,4 +1,5 @@
 import random
+from datetime import datetime, timedelta
 import uuid
 
 from django.contrib.auth import authenticate
@@ -7,7 +8,8 @@ from django.utils.dateparse import parse_datetime
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
 from .permissions import *
@@ -70,6 +72,7 @@ def get_place_by_id(request, place_id):
     return Response(serializer.data)
 
 
+@swagger_auto_schema(method='put', request_body=PlaceSerializer)
 @api_view(["PUT"])
 @permission_classes([IsModerator])
 def update_place(request, place_id):
@@ -86,17 +89,19 @@ def update_place(request, place_id):
     return Response(serializer.data)
 
 
+@swagger_auto_schema(method='POST', request_body=PlaceAddSerializer)
 @api_view(["POST"])
 @permission_classes([IsModerator])
+@parser_classes((MultiPartParser,))
 def create_place(request):
-    serializer = PlaceSerializer(data=request.data, partial=False)
+    serializer = PlaceAddSerializer(data=request.data)
 
     serializer.is_valid(raise_exception=True)
 
     Place.objects.create(**serializer.validated_data)
 
     places = Place.objects.filter(status=1)
-    serializer = PlaceSerializer(places, many=True)
+    serializer = PlacesSerializer(places, many=True)
 
     return Response(serializer.data)
 
@@ -145,8 +150,15 @@ def add_place_to_expedition(request, place_id):
     return Response(serializer.data["places"])
 
 
+@swagger_auto_schema(
+    method='post',
+    manual_parameters=[
+        openapi.Parameter('image', openapi.IN_FORM, type=openapi.TYPE_FILE),
+    ]
+)
 @api_view(["POST"])
 @permission_classes([IsModerator])
+@parser_classes((MultiPartParser,))
 def update_place_image(request, place_id):
     if not Place.objects.filter(pk=place_id).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
@@ -172,7 +184,7 @@ def update_place_image(request, place_id):
         openapi.Parameter(
             'status',
             openapi.IN_QUERY,
-            type=openapi.TYPE_STRING
+            type=openapi.TYPE_NUMBER
         ),
         openapi.Parameter(
             'date_formation_start',
@@ -203,10 +215,10 @@ def search_expeditions(request):
         expeditions = expeditions.filter(status=status_id)
 
     if date_formation_start and parse_datetime(date_formation_start):
-        expeditions = expeditions.filter(date_formation__gte=parse_datetime(date_formation_start))
+        expeditions = expeditions.filter(date_formation__gte=parse_datetime(date_formation_start) - timedelta(days=1))
 
     if date_formation_end and parse_datetime(date_formation_end):
-        expeditions = expeditions.filter(date_formation__lt=parse_datetime(date_formation_end))
+        expeditions = expeditions.filter(date_formation__lt=parse_datetime(date_formation_end) + timedelta(days=1))
 
     serializer = ExpeditionsSerializer(expeditions, many=True)
 
@@ -218,10 +230,14 @@ def search_expeditions(request):
 def get_expedition_by_id(request, expedition_id):
     user = identity_user(request)
 
-    if not Expedition.objects.filter(pk=expedition_id, owner=user).exists():
+    if not Expedition.objects.filter(pk=expedition_id).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     expedition = Expedition.objects.get(pk=expedition_id)
+
+    if not user.is_superuser and expedition.owner != user:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
     serializer = ExpeditionSerializer(expedition)
 
     return Response(serializer.data)
@@ -267,6 +283,12 @@ def update_status_user(request, expedition_id):
     return Response(serializer.data)
 
 
+def random_date():
+    now = datetime.now(tz=timezone.utc)
+    return now + timedelta(random.uniform(-1, 0) * 100)
+
+
+@swagger_auto_schema(method='put', request_body=UpdateExpeditionStatusAdminSerializer)
 @api_view(["PUT"])
 @permission_classes([IsModerator])
 def update_status_admin(request, expedition_id):
@@ -284,7 +306,7 @@ def update_status_admin(request, expedition_id):
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     if request_status == 3:
-        expedition.date = random.randint(1, 10)
+        expedition.date = random_date()
 
     expedition.status = request_status
     expedition.date_complete = timezone.now()
@@ -362,12 +384,6 @@ def update_place_in_expedition(request, expedition_id, place_id):
 @swagger_auto_schema(method='post', request_body=UserLoginSerializer)
 @api_view(["POST"])
 def login(request):
-    user = identity_user(request)
-
-    if user is not None:
-        serializer = UserSerializer(user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-        
     serializer = UserLoginSerializer(data=request.data)
 
     if not serializer.is_valid():

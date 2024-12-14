@@ -18,9 +18,15 @@ class PlacesSerializer(serializers.ModelSerializer):
 
 
 class PlaceSerializer(PlacesSerializer):
-    class Meta(PlacesSerializer.Meta):
+    class Meta:
         model = Place
         fields = "__all__"
+
+
+class PlaceAddSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Place
+        fields = ("name", "description", "square", "image")
 
 
 class ExpeditionsSerializer(serializers.ModelSerializer):
@@ -57,10 +63,14 @@ class PlaceExpeditionSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class UpdateExpeditionStatusAdminSerializer(serializers.Serializer):
+    status = serializers.IntegerField(required=True)
+
+    
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'email', 'username')
+        fields = ('id', 'username', "is_superuser")
 
 
 class UserRegisterSerializer(serializers.ModelSerializer):
@@ -83,8 +93,8 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 
 
 class UserLoginSerializer(serializers.Serializer):
-    username = serializers.CharField(required=False)
-    password = serializers.CharField(required=False)
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(required=True)
 
 
 class UserProfileSerializer(serializers.Serializer):
